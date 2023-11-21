@@ -1,20 +1,30 @@
+import csv
 import pathlib
+from typing import Callable, Optional
+
+from pydantic.types import PathType
+
+CURRENT_PATH = pathlib.Path().cwd()
+source = CURRENT_PATH / "file1.csv"
 
 
-def get_name_files():
-    """
-    Функция, которая записывает в два списка наименования файлов с расширениями .csv и .txt
-    :return: Словарь с двумя списками, хранящие наименования файлов с соответсвующими расширениями
-    """
-    csv_files = []
-    txt_files = []
-    current_path = pathlib.Path().absolute()
-    for files in current_path.iterdir():
-        if files.name.endswith(".csv"):
-            csv_files.append(files.name)
-        elif files.name.endswith(".txt"):
-            txt_files.append(files.name)
-    return {
-        'txt': txt_files,
-        'csv': csv_files
-    }
+def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = False,
+            key: Optional[Callable] = None) -> None:
+    key = str()
+    files = list()
+    if src.name.endswith("txt"):
+        files = list(CURRENT_PATH.glob("*.txt"))
+    elif src.name.endswith("csv"):
+        files = list(CURRENT_PATH.glob("*.csv"))
+    for name in files:
+        if name.stem == src.stem:
+            files.remove(name)
+
+    print(files)
+
+
+
+
+
+
+my_sort(source)
