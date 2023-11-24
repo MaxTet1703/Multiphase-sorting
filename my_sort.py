@@ -10,7 +10,7 @@ error = CURRENT_PATH / "sdfsdfsf.txt"
 
 def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = False,
             key: Optional[Callable] = None) -> None:
-    LIMIT_ELEMENT = 40
+    LIMIT_ELEMENT = 20
 
     if not src.exists():
         raise FileExistsError("File is not exist in the directory")
@@ -74,36 +74,65 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
     length_of_series = [0 if i == seq_count else 1 for i in range(seq_count)]
     number_of_series = distr
     list_for_merge = []
+    print(loops)
     del distr
 
-
-    for cfile in range(seq_count-1):
-        series = files[cfile].open(mode="r").readlines()[:length_of_series[cfile]+1]
-        series_csv = csv.DictReader(series, delimiter=";")
-        for ser in series_csv:
-            list_for_merge.append(ser)
-        new_data = files[cfile].open(mode="r").readlines()
-        new_data[1:length_of_series[cfile]+1] = ["" for _ in range(length_of_series[cfile])]
-        files[cfile].open(mode="w").writelines(new_data)
-    print(list_for_merge)
-    real_series = [element for element in list_for_merge if key(element) not in ("", "none")]
-    empty_series = [element for element in list_for_merge if key(element) in ("", "none")]
-    sort_series = []
-    while real_series:
-        selected = min(real_series, key=key)
-        sort_series.append(selected)
-        index_selected = real_series.index(selected)
-        real_series.pop(index_selected)
-    if empty_series:
-        sort_series.extend(empty_series)
-    write_csv = csv.DictWriter(files[-1], delimiter=";", fieldnames=list(selected.keys()))
-    for row in sort_series:
-        write_csv.writerow(row)
+    if source.suffix == ".csv":
+        csv_sort(files, length_of_series, list_for_merge, loops, seq_count, key)
 
 
+def csv_sort(files, length_of_series: list, list_for_merge: list,
+             loops: int, seq_count: int, key):
+    while loops > 0:
+        for cfile in range(seq_count - 1):
+            series = files[cfile].open(mode="r").readlines()[:length_of_series[cfile] + 1]
+            if len(series) == 1:
+                loops -= 1
+                files = update_map_of_files(files, cfile)
+                length_of_series = update_series(length_of_series, cfile)
+                break
+            series_csv = csv.DictReader(series, delimiter=";")
+            for ser in series_csv:
+                list_for_merge.append(ser)
+            new_data = files[cfile].open(mode="r").readlines()
+            new_data[1:length_of_series[cfile] + 1] = ["" for _ in range(length_of_series[cfile])]
+            files[cfile].open(mode="w").writelines(new_data)
+        else:
+            if len(series) == 1:
+                continue
+        print(list_for_merge)
+        real_series = [element for element in list_for_merge if key(element) not in ("", "none")]
+        empty_series = [element for element in list_for_merge if key(element) in ("", "none")]
+        sort_series = []
+        while real_series:
+            selected = min(real_series, key=key)
+            sort_series.append(selected)
+            index_selected = real_series.index(selected)
+            real_series.pop(index_selected)
+        if empty_series:
+            sort_series.extend(empty_series)
+        print(files[-1].name)
+        write_csv = csv.writer(files[-1].open(mode="+a"), delimiter=";")
+        for row in sort_series:
+            write_csv.writerow(list(row.values()))
 
 
+def update_map_of_files(files, cfile):
+    old_out = files[-1]
+    new_out = files[cfile]
+    files[-1] = new_out
+    files[cfile] = old_out
+    return files
 
+
+def update_series(length_of_series: list, cfile: int):
+    length_of_series[-1] = sum(length_of_series)
+    old_out = length_of_series[-1]
+    length_of_series[cfile] = 0
+    new_out = length_of_series[cfile]
+    length_of_series[-1] = old_out
+    length_of_series[cfile] = new_out
+    return length_of_series
 
 
 def distribution(files: list, empty_series: list):
@@ -120,4 +149,4 @@ def distribution(files: list, empty_series: list):
         empty_series[cfile] -= 1
 
 
-my_sort(source, key = lambda x: x['Возраст'])
+my_sort(source, key=lambda x: x['Возраст'], output=CURRENT_PATH / "response.csv")
