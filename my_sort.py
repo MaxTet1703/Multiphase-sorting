@@ -45,7 +45,6 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
         LIMIT_ELEMENT += 1
         with open(src.name, mode="r") as file:
             fieldnames = file.readline()
-            print(fieldnames)
         for f in files:
             with open(f.name, mode="a") as file:
                 file.write(fieldnames)
@@ -83,7 +82,8 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
     del distr
 
     if source.suffix == ".csv":
-        csv_sort(files, length_of_series, loops, seq_count, key, output, method, fieldnames)
+        csv_sort(files=files, length_of_series=length_of_series, loops=loops,
+                 seq_count=seq_count, key=key, output=output, method=method, fieldnames=fieldnames)
 
 
 def csv_sort(files, length_of_series: list,
@@ -91,7 +91,6 @@ def csv_sort(files, length_of_series: list,
     iteration = 0
     list_for_merge = list()
     while loops > 0:
-        print(loops)
         iteration += 1
         data = []
         for cfile in range(seq_count - 1):
@@ -118,20 +117,19 @@ def csv_sort(files, length_of_series: list,
             with open(files[cfile], mode="w") as file:
                 file.writelines(new_data)
 
-        real_series = [check_type(element) for element in list_for_merge if key(element) not in ("", "none")]
-        empty_series = [element for element in list_for_merge if key(element) in ("", "none;\n")]
+        real_series = [element for element in list_for_merge if list(element.values())[0] != "none"]
+        empty_series = [element for element in list_for_merge if element not in real_series]
+        real_series = [check_type(element) for element in real_series]
         sort_series = list()
 
         while real_series:
             selected = method(real_series, key=key)
-
             sort_series.append(selected)
             index_selected = real_series.index(selected)
             real_series.pop(index_selected)
-        else:
-            for element in sort_series:
-                for k in element.keys():
-                    element[k] = str(element[k])
+        for element in sort_series:
+            for k in element.keys():
+                element[k] = str(element[k])
 
         if empty_series:
             sort_series.extend(empty_series)
@@ -203,4 +201,4 @@ def distribution(files: list, empty_series: list):
         empty_series[cfile] -= 1
 
 
-my_sort("file1.csv", key=lambda x: x["Возраст"], output="response.csv", LIMIT_ELEMENT=10)
+my_sort("file1.csv", key=lambda x: -x["Возраст"], output="response.csv", LIMIT_ELEMENT=50, reverse=True)
