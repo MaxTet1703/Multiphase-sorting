@@ -9,26 +9,59 @@ error = CURRENT_PATH / "sdfsdfsf.txt"
 
 
 def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = False,
-            key: Optional[Callable] = None, LIMIT_ELEMENT=40) -> None:
-    src = CURRENT_PATH / src
-    if not src.exists():
-        raise FileExistsError("File is not exist in the directory")
+            key: Optional[Callable] = None, LIMIT_ELEMENT = 40) -> None:
+    src_list = []
+    link = None
+    if isinstance(src, list):
+        if len(src) == 1:
+            src = src[0]
+        else:
+
+            link = CURRENT_PATH / "link.csv"
+            if not link.exists():
+                link.touch(mode=0o644)
+            else:
+                with open(link, mode="w") as file:
+                    file.truncate(0)
+
+            for i in range(len(src)):
+                src[i] = CURRENT_PATH / src[i]
+                if not src[i].exists:
+                    src.remove(src[i])
+            if not src:
+                raise FileExistsError
+
+            if src[0].suffix == ".csv":
+                with open(link, mode="w") as link_file, open(src[0], mode="r") as file:
+                    link_file.write(file.readlines()[0])
+
+            for i in range(len(src)):
+                with open(src[i], mode="r") as read_file, open(link, mode="a") as write_file:
+                    if src[i].suffix == ".csv":
+                        write_file.writelines(read_file.readlines()[1::])
+                        write_file.write("\n")
+                    else:
+                        write_file.write(read_file.readlines())
+            src_list = src
+            src = link
+    else:
+        src = CURRENT_PATH / src
+        if not src.exists():
+            raise FileExistsError("File is not exist in the directory")
 
     if output is None:
         output = pathlib.Path(CURRENT_PATH / f"response{source.suffix}")
         output.touch(mode=0o644)
     else:
         output = CURRENT_PATH / output
+        if output.exists():
+            with open(output, mode="w") as file:
+                file.truncate()
+        else:
+            output.touch(mode=0o644)
 
-    files = [file for file in CURRENT_PATH.glob(f'*{src.suffix}') if file.name not in (src.name, output.name)]
-    if not files:
-        for i in range(1, 5):
-            new = pathlib.Path(f'file{i}{src.suffix}')
-            if new.exists():
-                del new
-                new = pathlib.Path(f'file{i + 1}{src.suffix}')
-            new.touch(mode=0o644)
-            files.append(new)
+    files = [file for file in CURRENT_PATH.glob(f'*{src.suffix}') if file not in src_list and file != src and file != output]
+
     files.append(output)
     seq_count = len(files)
 
@@ -67,7 +100,7 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
             cfile = 0
 
         with open(src.name, mode="r") as file:
-            row = file.readlines()[current_line:current_line+1][0]
+            row = file.readlines()[current_line:current_line+1]
             row = ''.join(row)
         with open(files[cfile].name, mode="a") as file:
             file.write(row)
@@ -78,12 +111,12 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
     if set(empty_series) != {0}:
         distribution(files, empty_series)
         loops += 1
-    print(distr)
-
 
     length_of_series = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     del distr
 
+    if link is not None:
+        link.unlink()
     if source.suffix == ".csv":
         csv_sort(files=files, length_of_series=length_of_series, loops=loops,
                  seq_count=seq_count, key=key, output=output, method=method, fieldnames=fieldnames)
@@ -91,7 +124,6 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
 
 def csv_sort(files, length_of_series: list,
              loops: int, seq_count: int, key, output, method: Callable, fieldnames: str):
-    out_file = 0
     print(loops)
     list_for_merge = list()
     while loops > 0:
@@ -144,7 +176,6 @@ def csv_sort(files, length_of_series: list,
         list_for_merge.clear()
         sort_series.clear()
 
-    print(files)
     if files[0] != output:
         with open(files[0].name, mode="r") as file, open(output.name, mode="w") as output_file :
             output_file.writelines([line for line in file.readlines() if "none" not in line])
@@ -206,4 +237,4 @@ def distribution(files: list, empty_series: list):
                     file.write("none;\n")
 
 
-my_sort("file1.csv", key=lambda x: -len(x["Имя"]), output="response.csv", LIMIT_ELEMENT=2, reverse=True)
+my_sort(src="file1.csv", key=lambda x: -len(x["Имя"]), output="response.csv", LIMIT_ELEMENT=15, reverse=True)
