@@ -52,7 +52,7 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
         current_line = 0
 
     cfile = 0
-    loops = 0
+    loops = 1
 
     while current_line < LIMIT_ELEMENT:
         if empty_series[cfile] < empty_series[cfile + 1]:
@@ -67,8 +67,8 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
             cfile = 0
 
         with open(src.name, mode="r") as file:
-            row = file.readlines()[current_line]
-
+            row = file.readlines()[current_line:current_line+1][0]
+            row = ''.join(row)
         with open(files[cfile].name, mode="a") as file:
             file.write(row)
 
@@ -78,6 +78,9 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
     if set(empty_series) != {0}:
         distribution(files, empty_series)
         loops += 1
+    print(distr)
+
+
     length_of_series = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     del distr
 
@@ -88,10 +91,10 @@ def my_sort(src: PathType, output: Optional[PathType] = None, reverse: bool = Fa
 
 def csv_sort(files, length_of_series: list,
              loops: int, seq_count: int, key, output, method: Callable, fieldnames: str):
-    iteration = 0
+    out_file = 0
+    print(loops)
     list_for_merge = list()
     while loops > 0:
-        iteration += 1
         data = []
         for cfile in range(seq_count - 1):
             with open(files[cfile], mode="r") as file:
@@ -99,7 +102,7 @@ def csv_sort(files, length_of_series: list,
             if not len(data)-1:
                 loops -= 1
                 if loops > 0:
-                    files = update_map_of_files(files, cfile)
+                    files = update_map_of_files(files, cfile, fieldnames)
                     length_of_series = update_series(length_of_series, cfile)
                 list_for_merge.clear()
                 break
@@ -112,7 +115,7 @@ def csv_sort(files, length_of_series: list,
         for cfile in range(seq_count - 1):
             with open(files[cfile], mode="r") as file:
                 data = file.readlines()
-                data[1:length_of_series[cfile]+1] = ["" for _ in data[1:length_of_series[cfile]+1]]
+                data[1:length_of_series[cfile] + 1] = ["" for _ in data[1:length_of_series[cfile] + 1]]
                 new_data = [line for line in data if line not in file.readlines()[1:length_of_series[cfile] + 1]]
             with open(files[cfile], mode="w") as file:
                 file.writelines(new_data)
@@ -134,32 +137,40 @@ def csv_sort(files, length_of_series: list,
         if empty_series:
             sort_series.extend(empty_series)
 
-        with open(files[-1], mode="w") as file:
-            file.write(fieldnames)
+        with open(files[-1], mode="a") as file:
             write_csv = csv.writer(file, delimiter=";")
             for row in sort_series:
                 write_csv.writerow(list(row.values()))
+        list_for_merge.clear()
+        sort_series.clear()
 
-    with open(files[-1].name, mode="r") as file:
-        new_data = file.readlines()
-    new_data = [line for line in new_data if "none" not in line]
-
-    with open(output.name, mode="w") as output_file:
-        output_file.writelines(new_data)
-
+    print(files)
+    if files[0] != output:
+        with open(files[0].name, mode="r") as file, open(output.name, mode="w") as output_file :
+            output_file.writelines([line for line in file.readlines() if "none" not in line])
+    else:
+        with open(output.name, mode="r+") as file:
+            file.seek(0)
+            for line in file.readlines()[1::]:
+                if "none" not in line:
+                    with open(files[-1].name, mode="a") as out:
+                        out.write(line)
+        with open(files[-1].name, mode="r") as file, open(output.name, mode="w") as output_file:
+            output_file.writelines(file.readlines())
     files.remove(output)
     for file in files:
         with open(file.name, mode="w") as file:
             file.truncate(0)
 
 
-def update_map_of_files(files, cfile):
+def update_map_of_files(files, cfile, fieldnames):
     old_out = files[-1]
     new_out = files[cfile]
     files[-1] = new_out
     files[cfile] = old_out
     with open(files[-1].name, mode="w") as file:
         file.truncate(0)
+        file.write(fieldnames)
     return files
 
 
@@ -188,17 +199,11 @@ def check_type(element):
 
 
 def distribution(files: list, empty_series: list):
-    resum = sum(empty_series)
-    cfile = 0
-    while resum > 0:
-        if empty_series[cfile] < empty_series[cfile + 1]:
-            cfile += 1
-        else:
-            cfile = 0
-
-        files[cfile].open(mode="+a").write("none;\n")
-        resum -= 1
-        empty_series[cfile] -= 1
+    for cfile in range(len(files) - 1):
+        if empty_series[cfile] != 0:
+            with open(files[cfile], mode="a") as file:
+                for _ in range(empty_series[cfile]):
+                    file.write("none;\n")
 
 
-my_sort("file1.csv", key=lambda x: -x["Возраст"], output="response.csv", LIMIT_ELEMENT=50, reverse=True)
+my_sort("file1.csv", key=lambda x: -len(x["Имя"]), output="response.csv", LIMIT_ELEMENT=2, reverse=True)
