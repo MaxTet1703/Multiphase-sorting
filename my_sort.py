@@ -8,9 +8,8 @@ CURRENT_PATH = pathlib.Path().cwd()
 
 
 def my_sort(src, output=None, reverse: bool = False,
-            key = None, LIMIT_ELEMENT=40, seq = 3) -> None:
+            key=None, LIMIT_ELEMENT=40, seq=3, request = False) -> None:
 
-    src_list = []
     link = None
     if isinstance(src, list):
         if len(src) == 1:
@@ -43,14 +42,14 @@ def my_sort(src, output=None, reverse: bool = False,
                         write_file.write("\n")
                     else:
                         write_file.write(read_file.readlines())
-            src_list = src
             src = link
     else:
         src = CURRENT_PATH / src
         if not src.exists():
             raise FileExistsError("File is not exist in the directory")
-
-    if output is None:
+    request = False
+    if not output:
+        request = True
         output = pathlib.Path(CURRENT_PATH / f"response{src.suffix}")
         if not output.exists():
             output.touch(mode=0o644)
@@ -74,7 +73,7 @@ def my_sort(src, output=None, reverse: bool = False,
         if not file.exists():
             file.touch(mode=0o644)
         files.append(file)
-
+    del letters
     files.append(output)
     seq_count = len(files)
 
@@ -133,18 +132,18 @@ def my_sort(src, output=None, reverse: bool = False,
     if link is not None:
         link.unlink()
     if src.suffix == ".csv":
-        csv_sort(files=files, length_of_series=length_of_series, loops=loops,
+        csv_sort(src=src, files=files, length_of_series=length_of_series, loops=loops,
                  seq_count=seq_count, key=key, output=output, method=method, fieldnames=fieldnames)
 
 
-def csv_sort(files, length_of_series: list,
-             loops: int, seq_count: int, key, output, method: Callable, fieldnames: str):
+def csv_sort(src, files, length_of_series: list,
+             loops: int, seq_count: int, key, output, method: Callable, fieldnames: str,):
     print(loops)
     list_for_merge = list()
     while loops > 0:
         data = []
         for cfile in range(seq_count - 1):
-            with open(files[cfile], mode="r") as file:
+            with open(files[cfile].name, mode="r") as file:
                 data = file.readlines()[:length_of_series[cfile] + 1]
             if not len(data) - 1:
                 loops -= 1
@@ -160,11 +159,11 @@ def csv_sort(files, length_of_series: list,
             continue
 
         for cfile in range(seq_count - 1):
-            with open(files[cfile], mode="r") as file:
+            with open(files[cfile].name, mode="r") as file:
                 data = file.readlines()
                 data[1:length_of_series[cfile] + 1] = ["" for _ in data[1:length_of_series[cfile] + 1]]
                 new_data = [line for line in data if line not in file.readlines()[1:length_of_series[cfile] + 1]]
-            with open(files[cfile], mode="w") as file:
+            with open(files[cfile].name, mode="w") as file:
                 file.writelines(new_data)
 
         real_series = [element for element in list_for_merge if list(element.values())[0] != "none"]
@@ -184,7 +183,7 @@ def csv_sort(files, length_of_series: list,
         if empty_series:
             sort_series.extend(empty_series)
 
-        with open(files[-1], mode="a") as file:
+        with open(files[-1].name, mode="a") as file:
             write_csv = csv.writer(file, delimiter=";")
             for row in sort_series:
                 write_csv.writerow(list(row.values()))
@@ -204,6 +203,7 @@ def csv_sort(files, length_of_series: list,
         with open(files[-1].name, mode="r") as file, open(output.name, mode="w") as output_file:
             output_file.writelines(file.readlines())
     files.remove(output)
+
     for file in files:
         file.unlink()
 
@@ -246,7 +246,7 @@ def check_type(element):
 def distribution(files: list, empty_series: list):
     for cfile in range(len(files) - 1):
         if empty_series[cfile] != 0:
-            with open(files[cfile], mode="a") as file:
+            with open(files[cfile].name, mode="a") as file:
                 for _ in range(empty_series[cfile]):
                     file.write("none;\n")
 

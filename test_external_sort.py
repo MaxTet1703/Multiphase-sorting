@@ -4,7 +4,7 @@ import csv
 import os
 import unittest
 import shutil
-
+from pathlib import Path
 from my_sort import my_sort  # pylint: disable=E0401
 
 TEST_NUMBER = [
@@ -196,6 +196,7 @@ class TestExternalSortCSVFile(unittest.TestCase):
     def setUp(self) -> None:
         """Создание файлов перед тестом."""
         self.file_name = "test_sort_csv.csv"
+        self.out_file = "output.csv"
         self.dir_name = "tests"
         if not os.path.exists(self.dir_name):
             os.mkdir(self.dir_name)
@@ -218,20 +219,22 @@ class TestExternalSortCSVFile(unittest.TestCase):
             with self.subTest():
                 my_sort(
                     src=[self.file_name],
-                    output="",
+                    output=self.out_file,
                     reverse=False,
-                    key=key
+                    key=key,
                 )
                 exit_file = []
-                ptr = open(self.file_name, "r", encoding="utf-8")
-                reader = csv.DictReader(ptr)
+                ptr = open(self.out_file, "r", encoding="utf-8")
+                reader = csv.DictReader(ptr, delimiter=';')
                 for _ in range(len(data)):
                     exit_file.append(int(next(reader)[key]))
                 ptr.close()
-                self.assertEqual(exit_file, sorted(data))
+                self.assertEqual(exit_file, sorted(data, reverse=False))
 
     def tearDown(self) -> None:
         """Действия после окончания теста."""
+        Path(self.file_name).unlink()
+        Path(self.out_file).unlink()
         shutil.rmtree(self.dir_name)
 
 # class TestExternalSortTwoFile(unittest.TestCase):
