@@ -8,8 +8,7 @@ CURRENT_PATH = pathlib.Path().cwd()
 
 
 def my_sort(src, output=None, reverse: bool = False,
-            key=None, LIMIT_ELEMENT=40, seq=3, request = False) -> None:
-
+            key=None, LIMIT_ELEMENT=40, seq=3) -> None:
     link = None
     if isinstance(src, list):
         if len(src) == 1:
@@ -17,19 +16,19 @@ def my_sort(src, output=None, reverse: bool = False,
             src = CURRENT_PATH / src
         else:
 
-            link = CURRENT_PATH / "link.csv"
-            if not link.exists():
-                link.touch(mode=0o644)
-            else:
-                with open(link, mode="+a") as file:
-                    file.truncate(0)
-
             for i in range(len(src)):
                 src[i] = CURRENT_PATH / src[i]
                 if not src[i].exists:
                     src.remove(src[i])
             if not src:
                 raise FileExistsError
+
+            link = CURRENT_PATH / f"link{src[0].suffix}"
+            if not link.exists():
+                link.touch(mode=0o644)
+            else:
+                with open(link, mode="+a") as file:
+                    file.truncate(0)
 
             if src[0].suffix == ".csv":
                 with open(link, mode="w") as link_file, open(src[0], mode="r") as file:
@@ -41,15 +40,13 @@ def my_sort(src, output=None, reverse: bool = False,
                         write_file.writelines(read_file.readlines()[1::])
                         write_file.write("\n")
                     else:
-                        write_file.write(read_file.readlines())
+                        write_file.writelines(read_file.readlines())
             src = link
     else:
         src = CURRENT_PATH / src
         if not src.exists():
             raise FileExistsError("File is not exist in the directory")
-    request = False
     if not output:
-        request = True
         output = pathlib.Path(CURRENT_PATH / f"response{src.suffix}")
         if not output.exists():
             output.touch(mode=0o644)
@@ -84,10 +81,8 @@ def my_sort(src, output=None, reverse: bool = False,
 
     distr = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     empty_series = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
-
     if src.suffix == ".csv":
         current_line = 1
-        LIMIT_ELEMENT += 1
         with open(src.name, mode="r") as file:
             fieldnames = file.readline()
         for f in files:
@@ -113,11 +108,12 @@ def my_sort(src, output=None, reverse: bool = False,
 
         with open(src.name, mode="r") as file:
             row = file.readlines()[current_line:current_line + 1]
-            row = ''.join(row)
+            row = ''.join(row).replace("\n", "")
+
         if not row:
             break
-        with open(files[cfile].name, mode="a") as file:
-            file.write(row)
+        with open(files[cfile].name, mode="+a") as file:
+            file.write(row + "\n")
 
         empty_series[cfile] -= 1
         current_line += 1
@@ -132,12 +128,83 @@ def my_sort(src, output=None, reverse: bool = False,
     if link is not None:
         link.unlink()
     if src.suffix == ".csv":
-        csv_sort(src=src, files=files, length_of_series=length_of_series, loops=loops,
+        csv_sort(files=files, length_of_series=length_of_series, loops=loops,
                  seq_count=seq_count, key=key, output=output, method=method, fieldnames=fieldnames)
+    else:
+
+        txt_sort(files=files, length_of_series=length_of_series,
+                 loops=loops, seq_count=seq_count, method=method, output=output)
 
 
-def csv_sort(src, files, length_of_series: list,
-             loops: int, seq_count: int, key, output, method: Callable, fieldnames: str,):
+def txt_sort(files, length_of_series: list,
+             loops: int, seq_count: int, output, method: Callable):
+    list_for_merge = list()
+    while loops > 0:
+        data = []
+        for cfile in range(seq_count - 1):
+            with open(files[cfile].name, mode="r") as file:
+                data = file.readlines()[:length_of_series[cfile]]
+            if not len(data):
+                loops -= 1
+                if loops > 0:
+                    files = update_map_of_files(files, cfile)
+                    length_of_series = update_series(length_of_series, cfile)
+                list_for_merge.clear()
+                break
+            data = [el.replace("\n", "") for el in data]
+            list_for_merge.extend(data)
+
+        if not len(data):
+            continue
+
+        for cfile in range(seq_count - 1):
+            with open(files[cfile].name, mode="r") as file:
+                data = file.readlines()
+                data[:length_of_series[cfile]] = ["" for _ in data[:length_of_series[cfile]]]
+                new_data = [line for line in data if line not in file.readlines()[:length_of_series[cfile]]]
+            with open(files[cfile].name, mode="w") as file:
+                file.writelines(new_data)
+
+        real_series = [element for element in list_for_merge if "none" not in element]
+        empty_series = [element for element in list_for_merge if element not in real_series]
+        real_series = [check_type_txt(element) for element in real_series]
+        sort_series = list()
+
+        while real_series:
+            selected = method(real_series)
+            sort_series.append(selected)
+            index_selected = real_series.index(selected)
+            real_series.pop(index_selected)
+        for i in range(len(sort_series)):
+            sort_series[i] = str(sort_series[i])
+
+        if empty_series:
+            sort_series.extend(empty_series)
+
+        with open(files[-1].name, mode="a") as file:
+            for row in sort_series:
+                file.write(row + "\n")
+        list_for_merge.clear()
+        sort_series.clear()
+    if files[0] != output:
+        with open(files[0].name, mode="r") as file, open(output.name, mode="w") as output_file:
+            output_file.writelines([line for line in file.readlines() if "none" not in line])
+    else:
+        with open(output.name, mode="r+") as file:
+            file.seek(0)
+            for line in file.readlines():
+                if "none" not in line:
+                    with open(files[-1].name, mode="a") as out:
+                        out.write(line)
+        with open(files[-1].name, mode="r") as file, open(output.name, mode="w") as output_file:
+            output_file.writelines(file.readlines())
+    files.remove(output)
+    for file in files:
+        file.unlink()
+
+
+def csv_sort(files, length_of_series: list,
+             loops: int, seq_count: int, key, output, method: Callable, fieldnames: str):
     print(loops)
     list_for_merge = list()
     while loops > 0:
@@ -168,7 +235,7 @@ def csv_sort(src, files, length_of_series: list,
 
         real_series = [element for element in list_for_merge if list(element.values())[0] != "none"]
         empty_series = [element for element in list_for_merge if element not in real_series]
-        real_series = [check_type(element) for element in real_series]
+        real_series = [check_type_csv(element) for element in real_series]
         sort_series = list()
 
         while real_series:
@@ -208,14 +275,15 @@ def csv_sort(src, files, length_of_series: list,
         file.unlink()
 
 
-def update_map_of_files(files, cfile, fieldnames):
+def update_map_of_files(files, cfile, fieldnames=None):
     old_out = files[-1]
     new_out = files[cfile]
     files[-1] = new_out
     files[cfile] = old_out
     with open(files[-1].name, mode="w") as file:
         file.truncate(0)
-        file.write(fieldnames)
+        if fieldnames is not None:
+            file.write(fieldnames)
     return files
 
 
@@ -227,7 +295,7 @@ def update_series(length_of_series: list, cfile: int):
     return length_of_series
 
 
-def check_type(element):
+def check_type_csv(element):
     for el in element.keys():
         has_digit = any([char.isdigit() for char in element[el]])
         has_letters = any([char.isalpha() for char in element[el]])
@@ -240,6 +308,23 @@ def check_type(element):
                 element[el] = int(element[el])
         else:
             element[el] = str(element[el])
+
+    return element
+
+
+def check_type_txt(element):
+    has_digit = any([char.isdigit() for char in element])
+    has_letters = any([char.isalpha() for char in element])
+    if has_digit and has_letters:
+        element = str(element)
+    elif has_digit and not has_letters:
+        if "." in element:
+            element = float(element)
+        else:
+            element = int(element)
+    else:
+        element = str(element)
+
     return element
 
 
@@ -251,4 +336,3 @@ def distribution(files: list, empty_series: list):
                     file.write("none;\n")
 
 
-# my_sort(src="file1.csv", key="Имя", output="response.csv", LIMIT_ELEMENT=15, reverse=True)
