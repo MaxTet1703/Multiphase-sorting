@@ -9,6 +9,17 @@ CURRENT_PATH = pathlib.Path().cwd()
 
 def my_sort(src, output=None, reverse: bool = False,
             key=None, LIMIT_ELEMENT=40, seq=3) -> None:
+    """
+    Создание последовательностей, работа с параметрами scr и output,
+    Распределение элементов в последовательности
+    :param src: Входной файл, может быть несколько
+    :param output: Выходной файл
+    :param reverse: Флаг обратной сортировки
+    :param key: Ключ сортировки
+    :param LIMIT_ELEMENT: Число сортируемых элементов
+    :param seq: Число последовтельностей
+    :return:
+    """
     link = None
     if isinstance(src, list):
         if len(src) == 1:
@@ -78,16 +89,16 @@ def my_sort(src, output=None, reverse: bool = False,
         method = max
     else:
         method = min
-
+    src_file = open(src.name, mode="r")
     distr = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     empty_series = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     if src.suffix == ".csv":
         current_line = 1
-        with open(src.name, mode="r") as file:
-            fieldnames = file.readline()
+        fieldnames = src_file.readline()
         for f in files:
-            with open(f.name, mode="a") as file:
-                file.write(fieldnames)
+            file = open(f.name, mode="w")
+            file.write(fieldnames)
+            file.close()
     else:
         current_line = 0
 
@@ -106,21 +117,19 @@ def my_sort(src, output=None, reverse: bool = False,
                     distr[i] = distr0 + distr[i + 1]
             cfile = 0
 
-        with open(src.name, mode="r") as file:
-            row = file.readlines()[current_line:current_line + 1]
-            row = ''.join(row).replace("\n", "")
-
+        row = src_file.readline().replace("\n", "")
         if not row:
             break
-        with open(files[cfile].name, mode="+a") as file:
-            file.write(row + "\n")
-
+        file = open(files[cfile].name, mode="a")
+        file.write(row + "\n")
+        file.close()
         empty_series[cfile] -= 1
         current_line += 1
+    src_file.close()
 
-    if set(empty_series) != {0}:
+    if sum(empty_series) != 0:
         distribution(files, empty_series)
-        loops += 1
+    loops += 1
 
     length_of_series = [0 if i == seq_count - 1 else 1 for i in range(seq_count)]
     del distr
@@ -138,6 +147,16 @@ def my_sort(src, output=None, reverse: bool = False,
 
 def txt_sort(files, length_of_series: list,
              loops: int, seq_count: int, output, method: Callable):
+    """
+    Многофазная сортировка для .txt файлов
+    :param files: пути к последовтаельностям и выходному файлу
+    :param length_of_series: длина серий в каждом файле
+    :param loops: Число прохожов
+    :param seq_count: Число последовательностей
+    :param output: Выходной файл
+    :param method: Метод сопоставимый с reverse
+    :return:
+    """
     list_for_merge = list()
     while loops > 0:
         data = []
@@ -205,6 +224,17 @@ def txt_sort(files, length_of_series: list,
 
 def csv_sort(files, length_of_series: list,
              loops: int, seq_count: int, key, output, method: Callable, fieldnames: str):
+    """
+    Многофазная сортировка для .csv файлов
+    :param files: пути к последовтаельностям и выходному файлу
+    :param length_of_series: длина серий в каждом файле
+    :param loops: Число прохожов
+    :param seq_count: Число последовательностей
+    :param output: Выходной файл
+    :param method: Метод сопоставимый с reverse
+    :param fieldnames: Поля таблицы
+    :return:
+    """
     print(loops)
     list_for_merge = list()
     while loops > 0:
@@ -276,6 +306,13 @@ def csv_sort(files, length_of_series: list,
 
 
 def update_map_of_files(files, cfile, fieldnames=None):
+    """
+    Переопределение карты индексов в files после окончания прохода
+    :param files: Список путей к файлам
+    :param cfile: Индекс файла, который станет выходным
+    :param fieldnames: Поля таблицы
+    :return: Обновленный files
+    """
     old_out = files[-1]
     new_out = files[cfile]
     files[-1] = new_out
@@ -288,6 +325,12 @@ def update_map_of_files(files, cfile, fieldnames=None):
 
 
 def update_series(length_of_series: list, cfile: int):
+    """
+    Обновление числа серий в файлах
+    :param length_of_series: Список длин серий
+    :param cfile: Индекс файла, который станет входным
+    :return: обновленный lenght_of_series
+    """
     length_of_series[-1] = sum(length_of_series)
     length_of_series[cfile] = length_of_series[-1]
     length_of_series[-1] = 0
@@ -296,6 +339,11 @@ def update_series(length_of_series: list, cfile: int):
 
 
 def check_type_csv(element):
+    """
+    Преобразования элемента в нужный тип данных для сравнения в csv
+    :param element: Сам элемент
+    :return: преобразованный элемент
+    """
     for el in element.keys():
         has_digit = any([char.isdigit() for char in element[el]])
         has_letters = any([char.isalpha() for char in element[el]])
@@ -313,6 +361,11 @@ def check_type_csv(element):
 
 
 def check_type_txt(element):
+    """
+     Преобразования элемента в нужный тип данных для сравнения в csv
+    :param element: Сам элемент
+    :return: преобразованный элемент
+    """
     has_digit = any([char.isdigit() for char in element])
     has_letters = any([char.isalpha() for char in element])
     if has_digit and has_letters:
@@ -329,6 +382,12 @@ def check_type_txt(element):
 
 
 def distribution(files: list, empty_series: list):
+    """
+    Дополнения пос-тей пустыми сериями, если рапсределение неравномерное
+    :param files: список файлов
+    :param empty_series: Список кол-ва пустых серий в каждом файле
+    :return:
+    """
     for cfile in range(len(files) - 1):
         if empty_series[cfile] != 0:
             with open(files[cfile].name, mode="a") as file:
